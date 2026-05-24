@@ -27,70 +27,68 @@ function updateLiveMap() {
             let activeCount = 0;
 
             results.data.forEach(row => {
-    const lat = parseFloat(row["Latitude"]);
-    const lng = parseFloat(row["Longitude"]);
-    const timestampStr = row["TimeStamp"]; // e.g., "24-05-2026 22:23"
+                const lat = parseFloat(row["Latitude"]);
+                const lng = parseFloat(row["Longitude"]);
+                // FIX 1: Matches your exact lowercase "Timestamp" column header
+                const timestampStr = row["Timestamp"]; 
 
-    if (isNaN(lat) || isNaN(lng) || !timestampStr) return;
+                if (isNaN(lat) || isNaN(lng) || !timestampStr) return;
 
-    // --- FIX: Manual Date String Re-arrangement ---
-    // Splits "24-05-2026 22:23" into ["24-05-2026", "22:23"]
-    const parts = timestampStr.trim().split(" ");
-    if (parts.length < 2) return;
+                // --- FIX 2: Slash Parser for "DD/MM/YYYY HH:MM" ---
+                const parts = timestampStr.trim().split(" ");
+                if (parts.length < 2) return;
 
-    // Splits "24-05-2026" into ["24", "05", "2026"]
-    const dateParts = parts[0].split("-");
-    if (dateParts.length < 3) return;
+                // Splits using forward slashes "/" instead of dashes "-"
+                const dateParts = parts[0].split("/");
+                if (dateParts.length < 3) return;
 
-    const day = dateParts[0];
-    const month = dateParts[1];
-    const year = dateParts[2];
-    const time = parts[1];
+                const day = dateParts[0];
+                const month = dateParts[1];
+                const year = dateParts[2];
+                const time = parts[1];
 
-    // Reconstructs into valid standard: "2026-05-24T22:23:00"
-    const validIsoString = `${year}-${month}-${day}T${time}:00`;
-    const submissionTime = new Date(validIsoString);
-    // ----------------------------------------------
+                // Reconstruct into valid ISO standard
+                const validIsoString = `${year}-${month}-${day}T${time}:00`;
+                const submissionTime = new Date(validIsoString);
+                // -------------------------------------------------
 
-    const now = new Date();
-    const oneDayInMs = 24 * 60 * 60 * 1000;
-    const ageInMs = now - submissionTime;
+                const ageInMs = now - submissionTime;
 
-    // Mode 2 Rule: Skip data older than 24 hours or completely invalid dates
-    if (isNaN(ageInMs) || ageInMs < 0 || ageInMs > oneDayInMs) return;
+                // Mode 2 Rule: Skip data older than 24 hours or completely invalid dates
+                if (isNaN(ageInMs) || ageInMs < 0 || ageInMs > oneDayInMs) return;
 
-    activeCount++;
-    const ageInHours = ageInMs / (1000 * 60 * 60);
+                activeCount++;
+                const ageInHours = ageInMs / (1000 * 60 * 60);
 
-    let marker;
+                let marker;
 
-    if (ageInHours <= 1) {
-        // Item happened within the last hour: Pulsing neon effect
-        const pulseIcon = L.divIcon({
-            className: 'fresh-ping',
-            iconSize: [12, 12]
-        });
-        marker = L.marker([lat, lng], { icon: pulseIcon });
-    } else {
-        // Scale opacity down dynamically from 0.8 to 0.1 based on age
-        const opacityScale = 0.8 - (ageInHours / 24) * 0.7;
-        marker = L.circleMarker([lat, lng], {
-            radius: 5,
-            color: '#00ccff',
-            fillColor: '#00ccff',
-            fillOpacity: opacityScale,
-            opacity: opacityScale
-        });
-    }
+                if (ageInHours <= 1) {
+                    // Item happened within the last hour: Pulsing neon effect
+                    const pulseIcon = L.divIcon({
+                        className: 'fresh-ping',
+                        iconSize: [12, 12]
+                    });
+                    marker = L.marker([lat, lng], { icon: pulseIcon });
+                } else {
+                    // Scale opacity down dynamically from 0.8 to 0.1 based on age
+                    const opacityScale = 0.8 - (ageInHours / 24) * 0.7;
+                    marker = L.circleMarker([lat, lng], {
+                        radius: 5,
+                        color: '#00ccff',
+                        fillColor: '#00ccff',
+                        fillOpacity: opacityScale,
+                        opacity: opacityScale
+                    });
+                }
 
-    const relativeLabel = ageInHours < 1 
-        ? `${Math.round(ageInHours * 60)} mins ago` 
-        : `${Math.round(ageInHours)} hours ago`;
-    
-    marker.bindPopup(`<b>Submission</b><br>${relativeLabel}`);
-    marker.addTo(map);
-    activeMarkers.push(marker);
-});
+                const relativeLabel = ageInHours < 1 
+                    ? `${Math.round(ageInHours * 60)} mins ago` 
+                    : `${Math.round(ageInHours)} hours ago`;
+                
+                marker.bindPopup(`<b>Submission</b><br>${relativeLabel}`);
+                marker.addTo(map);
+                activeMarkers.push(marker);
+            });
 
             // Update UI Counter panel
             document.getElementById('stats').innerText = `⚡ ${activeCount} active points in past 24h`;
