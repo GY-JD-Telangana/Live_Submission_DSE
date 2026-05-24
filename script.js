@@ -91,7 +91,7 @@ function updateLiveMap() {
             });
 
             // Update UI Counter panel
-            document.getElementById('stats').innerText = `⚡ ${activeCount} Customer visits in past 24h`;
+            document.getElementById('stats').innerText = `⚡ ${activeCount} Customers visits in past 24h`;
         }
     });
 }
