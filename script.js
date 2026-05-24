@@ -29,7 +29,6 @@ function updateLiveMap() {
             results.data.forEach(row => {
                 const lat = parseFloat(row["Latitude"]);
                 const lng = parseFloat(row["Longitude"]);
-                // FIX 1: Matches your exact lowercase "Timestamp" column header
                 const timestampStr = row["TimeStamp"]; 
 
                 if (isNaN(lat) || isNaN(lng) || !timestampStr) return;
@@ -91,7 +90,7 @@ function updateLiveMap() {
             });
 
             // Update UI Counter panel
-            document.getElementById('stats').innerText = `⚡ ${activeCount} Customers visits in past 24h`;
+            document.getElementById('stats').innerText = `⚡ ${activeCount} Customers visits in last 24 hours`;
         }
     });
 }
