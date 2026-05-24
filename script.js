@@ -30,7 +30,7 @@ function updateLiveMap() {
                 // Ensure field names match your exact sheet column names!
                 const lat = parseFloat(row["Latitude"]);
                 const lng = parseFloat(row["Longitude"]);
-                const timestampStr = row["Timestamp"]; 
+                const timestampStr = row["TimeStamp"]; 
 
                 if (isNaN(lat) || !lng || !timestampStr) return;
 
