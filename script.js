@@ -30,7 +30,7 @@ function updateLiveMap() {
                 const lat = parseFloat(row["Latitude"]);
                 const lng = parseFloat(row["Longitude"]);
                 // FIX 1: Matches your exact lowercase "Timestamp" column header
-                const timestampStr = row["Timestamp"]; 
+                const timestampStr = row["TimeStamp"]; 
 
                 if (isNaN(lat) || isNaN(lng) || !timestampStr) return;
 
