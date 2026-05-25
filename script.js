@@ -1,5 +1,6 @@
-// Paste your exact published Google Sheet CSV URL here
-const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQJ5XPG5xNDSkli3nYtaQvYvr64VVqwk2dQli6RAJy1uBTnWVi-rjAmaGvFn3gu81CqSRdZ0Ys8JHua/pub?gid=0&single=true&output=csv";
+// Corrected Google Sheet CSV export URL format
+// Replace the spreadsheet ID in the URL with your actual ID
+const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/2PACX-1vQJ5XPG5xNDSkli3nYtaQvYvr64VVqwk2dQli6RAJy1uBTnWVi-rjAmaGvFn3gu81CqSRdZ0Ys8JHua/export?format=csv&gid=0";
 
 // Initialize a dark-themed world map centered globally
 const map = L.map('map', { zoomControl: false }).setView([20, 0], 2);
@@ -74,6 +75,8 @@ function updateLiveMap() {
         header: true,
         skipEmptyLines: true,
         complete: function(results) {
+            console.log("Data loaded successfully:", results);
+            
             // Clear existing markers from previous run
             activeMarkers.forEach(marker => map.removeLayer(marker));
             activeMarkers = [];
@@ -153,7 +156,7 @@ function updateLiveMap() {
         },
         error: function(error) {
             console.error("Papa Parse error:", error);
-            document.getElementById('stats').innerText = "❌ Error loading data";
+            document.getElementById('stats').innerText = "❌ Error loading data - Check console";
         }
     });
 }
