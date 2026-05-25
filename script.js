@@ -1,10 +1,7 @@
-// Google Sheet CSV URL - using CORS proxy to bypass restrictions
-// The CORS proxy allows cross-origin requests to Google Sheets
+// Google Sheets API approach - No CORS issues!
+// This uses the Google Sheets API v4 which is CORS-enabled by default
 const SHEET_ID = "2PACX-1vQJ5XPG5xNDSkli3nYtaQvYvr64VVqwk2dQli6RAJy1uBTnWVi-rjAmaGvFn3gu81CqSRdZ0Ys8JHua";
-const SHEET_CSV_URL = `https://cors-anywhere.herokuapp.com/https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
-
-// Fallback CORS proxy if the first one is down
-const SHEET_CSV_URL_BACKUP = `https://api.allorigins.win/raw?url=https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
+const API_KEY = "AIzaSyDyWJHwC8M4-XMfxT_kLM8p8C8S9zJm7Ak"; // Public API key for Sheets API
 
 // Initialize a dark-themed world map centered globally
 const map = L.map('map', { zoomControl: false }).setView([20, 0], 2);
@@ -73,44 +70,73 @@ function parseDateString(dateStr) {
     return date;
 }
 
-function updateLiveMap(useBackup = false) {
-    const url = useBackup ? SHEET_CSV_URL_BACKUP : SHEET_CSV_URL;
-    console.log("Attempting to load from:", url);
+function updateLiveMap() {
+    // Using Google Sheets API v4 to fetch data
+    const apiUrl = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/Sheet1?key=${API_KEY}`;
     
-    Papa.parse(url, {
-        download: true,
-        header: true,
-        skipEmptyLines: true,
-        complete: function(results) {
-            console.log("Data loaded successfully:", results);
+    console.log("Attempting to load from Google Sheets API...");
+    
+    fetch(apiUrl)
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`API Error: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log("Data loaded successfully from Google Sheets API:", data);
             
             // Clear existing markers from previous run
             activeMarkers.forEach(marker => map.removeLayer(marker));
             activeMarkers = [];
+
+            if (!data.values || data.values.length < 2) {
+                console.warn("No data found in sheet");
+                document.getElementById('stats').innerText = "⚠️ No data in sheet";
+                return;
+            }
+
+            // Parse header row
+            const headers = data.values[0];
+            const timestampIdx = headers.indexOf("TimeStamp");
+            const latIdx = headers.indexOf("Latitude");
+            const lngIdx = headers.indexOf("Longitude");
+
+            if (timestampIdx === -1 || latIdx === -1 || lngIdx === -1) {
+                console.error("Missing required columns. Headers:", headers);
+                document.getElementById('stats').innerText = "❌ Missing required columns";
+                return;
+            }
 
             const now = new Date();
             const oneDayInMs = 24 * 60 * 60 * 1000;
             let activeCount = 0;
             let errorCount = 0;
 
-            results.data.forEach((row, index) => {
-                const lat = parseFloat(row["Latitude"]);
-                const lng = parseFloat(row["Longitude"]);
-                const timestampStr = row["TimeStamp"];
+            // Process data rows (skip header)
+            for (let i = 1; i < data.values.length; i++) {
+                const row = data.values[i];
+                
+                const timestampStr = row[timestampIdx];
+                const latStr = row[latIdx];
+                const lngStr = row[lngIdx];
+
+                const lat = parseFloat(latStr);
+                const lng = parseFloat(lngStr);
 
                 // Validate coordinates
                 if (isNaN(lat) || isNaN(lng)) {
-                    console.warn(`Row ${index}: Invalid coordinates - lat:${lat}, lng:${lng}`);
+                    console.warn(`Row ${i}: Invalid coordinates - lat:${lat}, lng:${lng}`);
                     errorCount++;
-                    return;
+                    continue;
                 }
 
                 // Parse timestamp
                 const submissionTime = parseDateString(timestampStr);
                 if (!submissionTime) {
-                    console.warn(`Row ${index}: Failed to parse timestamp - "${timestampStr}"`);
+                    console.warn(`Row ${i}: Failed to parse timestamp - "${timestampStr}"`);
                     errorCount++;
-                    return;
+                    continue;
                 }
 
                 const ageInMs = now - submissionTime;
@@ -118,8 +144,8 @@ function updateLiveMap(useBackup = false) {
                 // Mode 2 Rule: Skip data older than 24 hours or with invalid ages
                 // Allow small negative values (up to 15 min) for clock skew
                 if (isNaN(ageInMs) || ageInMs < -900000 || ageInMs > oneDayInMs) {
-                    console.warn(`Row ${index}: Age out of range - ageInMs:${ageInMs}, timestamp: ${submissionTime}`);
-                    return;
+                    console.warn(`Row ${i}: Age out of range - ageInMs:${ageInMs}`);
+                    continue;
                 }
 
                 activeCount++;
@@ -153,30 +179,22 @@ function updateLiveMap(useBackup = false) {
                 marker.bindPopup(`<b>Submission</b><br>${relativeLabel}`);
                 marker.addTo(map);
                 activeMarkers.push(marker);
-            });
+            }
 
             // Update UI Counter panel with debug info if errors occurred
             const debugInfo = errorCount > 0 ? ` (${errorCount} entries skipped)` : '';
             document.getElementById('stats').innerText = `⚡ ${activeCount} Customers visits in last 24 hours${debugInfo}`;
             
             console.log(`Map updated: ${activeCount} markers shown, ${errorCount} entries with errors`);
-        },
-        error: function(error) {
-            console.error("Papa Parse error:", error);
-            
-            // Try backup CORS proxy if first one fails
-            if (!useBackup) {
-                console.log("Primary CORS proxy failed, trying backup...");
-                updateLiveMap(true);
-            } else {
-                document.getElementById('stats').innerText = "❌ Unable to load data - Check sheet URL";
-            }
-        }
-    });
+        })
+        .catch(error => {
+            console.error("Failed to load data:", error);
+            document.getElementById('stats').innerText = "❌ Unable to load data - Check settings";
+        });
 }
 
 // Ingest data immediately upon landing
 updateLiveMap();
 
-// Poll the Google Sheet URL every 60 seconds for live changes without reloading the page
+// Poll every 60 seconds for live changes
 setInterval(updateLiveMap, 60000);
