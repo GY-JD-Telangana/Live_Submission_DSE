@@ -12,6 +12,62 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
 // Keep track of active markers to clear them on refresh
 let activeMarkers = [];
 
+// Function to parse DD/MM/YYYY HH:MM format to Date object
+function parseDateString(dateStr) {
+    if (!dateStr) return null;
+    
+    const trimmed = dateStr.trim();
+    const parts = trimmed.split(" ");
+    
+    if (parts.length < 2) {
+        console.warn("Invalid date format:", dateStr);
+        return null;
+    }
+    
+    const dateParts = parts[0].split("/");
+    if (dateParts.length !== 3) {
+        console.warn("Invalid date parts:", dateStr);
+        return null;
+    }
+    
+    const day = parseInt(dateParts[0], 10);
+    const month = parseInt(dateParts[1], 10);
+    const year = parseInt(dateParts[2], 10);
+    const time = parts[1];
+    
+    // Validate date components
+    if (isNaN(day) || isNaN(month) || isNaN(year) || day < 1 || day > 31 || month < 1 || month > 12) {
+        console.warn("Invalid date components:", { day, month, year });
+        return null;
+    }
+    
+    // Parse time HH:MM
+    const timeParts = time.split(":");
+    if (timeParts.length < 2) {
+        console.warn("Invalid time format:", time);
+        return null;
+    }
+    
+    const hours = parseInt(timeParts[0], 10);
+    const minutes = parseInt(timeParts[1], 10);
+    
+    if (isNaN(hours) || isNaN(minutes)) {
+        console.warn("Invalid time components:", { hours, minutes });
+        return null;
+    }
+    
+    // Create date object - using UTC to avoid timezone issues
+    // Note: JavaScript months are 0-indexed
+    const date = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0));
+    
+    if (isNaN(date.getTime())) {
+        console.warn("Invalid date object created from:", dateStr);
+        return null;
+    }
+    
+    return date;
+}
+
 function updateLiveMap() {
     Papa.parse(SHEET_CSV_URL, {
         download: true,
@@ -25,34 +81,36 @@ function updateLiveMap() {
             const now = new Date();
             const oneDayInMs = 24 * 60 * 60 * 1000;
             let activeCount = 0;
+            let errorCount = 0;
 
-            results.data.forEach(row => {
+            results.data.forEach((row, index) => {
                 const lat = parseFloat(row["Latitude"]);
                 const lng = parseFloat(row["Longitude"]);
-                const timestampStr = row["TimeStamp"]; 
+                const timestampStr = row["TimeStamp"];
 
-                if (isNaN(lat) || isNaN(lng) || !timestampStr) return;
+                // Validate coordinates
+                if (isNaN(lat) || isNaN(lng)) {
+                    console.warn(`Row ${index}: Invalid coordinates - lat:${lat}, lng:${lng}`);
+                    errorCount++;
+                    return;
+                }
 
-                // --- Slash Parser for "DD/MM/YYYY HH:MM" ---
-                const parts = timestampStr.trim().split(" ");
-                if (parts.length < 2) return;
+                // Parse timestamp
+                const submissionTime = parseDateString(timestampStr);
+                if (!submissionTime) {
+                    console.warn(`Row ${index}: Failed to parse timestamp - "${timestampStr}"`);
+                    errorCount++;
+                    return;
+                }
 
-                const dateParts = parts[0].split("/");
-                if (dateParts.length < 3) return;
-
-                const day = dateParts[0];
-                const month = dateParts[1];
-                const year = dateParts[2];
-                const time = parts[1];
-
-                // Reconstruct into valid ISO standard with explicit Indian Standard Time offset (+05:30)
-                const validIsoString = `${year}-${month}-${day}T${time}:00+05:30`;
-                const submissionTime = new Date(validIsoString);
-                
                 const ageInMs = now - submissionTime;
 
-                // Mode 2 Rule: Skip data older than 24 hours OR completely invalid dates
-                if (isNaN(ageInMs) || ageInMs < -21600000 || ageInMs > oneDayInMs) return;
+                // Mode 2 Rule: Skip data older than 24 hours or with invalid ages
+                // Allow small negative values (up to 15 min) for clock skew
+                if (isNaN(ageInMs) || ageInMs < -900000 || ageInMs > oneDayInMs) {
+                    console.warn(`Row ${index}: Age out of range - ageInMs:${ageInMs}, timestamp: ${submissionTime}`);
+                    return;
+                }
 
                 activeCount++;
                 const ageInHours = ageInMs / (1000 * 60 * 60);
@@ -68,7 +126,7 @@ function updateLiveMap() {
                     marker = L.marker([lat, lng], { icon: pulseIcon });
                 } else {
                     // Scale opacity down dynamically from 0.8 to 0.1 based on age
-                    const opacityScale = 0.8 - (ageInHours / 24) * 0.7;
+                    const opacityScale = Math.max(0.1, 0.8 - (ageInHours / 24) * 0.7);
                     marker = L.circleMarker([lat, lng], {
                         radius: 5,
                         color: '#00ccff',
@@ -87,8 +145,15 @@ function updateLiveMap() {
                 activeMarkers.push(marker);
             });
 
-            // Update UI Counter panel
-            document.getElementById('stats').innerText = `⚡ ${activeCount} Customers visits in last 24 hours`;
+            // Update UI Counter panel with debug info if errors occurred
+            const debugInfo = errorCount > 0 ? ` (${errorCount} entries skipped)` : '';
+            document.getElementById('stats').innerText = `⚡ ${activeCount} Customers visits in last 24 hours${debugInfo}`;
+            
+            console.log(`Map updated: ${activeCount} markers shown, ${errorCount} entries with errors`);
+        },
+        error: function(error) {
+            console.error("Papa Parse error:", error);
+            document.getElementById('stats').innerText = "❌ Error loading data";
         }
     });
 }
