@@ -52,7 +52,16 @@ function updateLiveMap() {
                 // -------------------------------------------------
 
                 const ageInMs = now - submissionTime;
+// Reconstruct into valid ISO standard with explicit Indian Standard Time offset (+05:30)
+                const validIsoString = `${year}-${month}-${day}T${time}:00+05:30`;
+                const submissionTime = new Date(validIsoString);
+                // -------------------------------------------------
 
+                const ageInMs = now - submissionTime;
+
+                // Mode 2 Rule Restored: Skip data older than 24 hours OR completely invalid dates
+                // We allow a small buffer (-6 hours in MS) in case your computer clock is slightly desynced from the sheet
+                if (isNaN(ageInMs) || ageInMs < -21600000 || ageInMs > oneDayInMs) return;
                 activeCount++;
                 const ageInHours = ageInMs / (1000 * 60 * 60);
 
