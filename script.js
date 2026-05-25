@@ -1,6 +1,10 @@
-// Corrected Google Sheet CSV export URL format
-// Replace the spreadsheet ID in the URL with your actual ID
-const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/2PACX-1vQJ5XPG5xNDSkli3nYtaQvYvr64VVqwk2dQli6RAJy1uBTnWVi-rjAmaGvFn3gu81CqSRdZ0Ys8JHua/export?format=csv&gid=0";
+// Google Sheet CSV URL - using CORS proxy to bypass restrictions
+// The CORS proxy allows cross-origin requests to Google Sheets
+const SHEET_ID = "2PACX-1vQJ5XPG5xNDSkli3nYtaQvYvr64VVqwk2dQli6RAJy1uBTnWVi-rjAmaGvFn3gu81CqSRdZ0Ys8JHua";
+const SHEET_CSV_URL = `https://cors-anywhere.herokuapp.com/https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
+
+// Fallback CORS proxy if the first one is down
+const SHEET_CSV_URL_BACKUP = `https://api.allorigins.win/raw?url=https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=0`;
 
 // Initialize a dark-themed world map centered globally
 const map = L.map('map', { zoomControl: false }).setView([20, 0], 2);
@@ -69,8 +73,11 @@ function parseDateString(dateStr) {
     return date;
 }
 
-function updateLiveMap() {
-    Papa.parse(SHEET_CSV_URL, {
+function updateLiveMap(useBackup = false) {
+    const url = useBackup ? SHEET_CSV_URL_BACKUP : SHEET_CSV_URL;
+    console.log("Attempting to load from:", url);
+    
+    Papa.parse(url, {
         download: true,
         header: true,
         skipEmptyLines: true,
@@ -156,7 +163,14 @@ function updateLiveMap() {
         },
         error: function(error) {
             console.error("Papa Parse error:", error);
-            document.getElementById('stats').innerText = "❌ Error loading data - Check console";
+            
+            // Try backup CORS proxy if first one fails
+            if (!useBackup) {
+                console.log("Primary CORS proxy failed, trying backup...");
+                updateLiveMap(true);
+            } else {
+                document.getElementById('stats').innerText = "❌ Unable to load data - Check sheet URL";
+            }
         }
     });
 }
