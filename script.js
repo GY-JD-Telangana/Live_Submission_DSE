@@ -33,11 +33,10 @@ function updateLiveMap() {
 
                 if (isNaN(lat) || isNaN(lng) || !timestampStr) return;
 
-                // --- FIX 2: Slash Parser for "DD/MM/YYYY HH:MM" ---
+                // --- Slash Parser for "DD/MM/YYYY HH:MM" ---
                 const parts = timestampStr.trim().split(" ");
                 if (parts.length < 2) return;
 
-                // Splits using forward slashes "/" instead of dashes "-"
                 const dateParts = parts[0].split("/");
                 if (dateParts.length < 3) return;
 
@@ -46,22 +45,15 @@ function updateLiveMap() {
                 const year = dateParts[2];
                 const time = parts[1];
 
-                // Reconstruct into valid ISO standard
-                const validIsoString = `${year}-${month}-${day}T${time}:00`;
-                const submissionTime = new Date(validIsoString);
-                // -------------------------------------------------
-
-                const ageInMs = now - submissionTime;
-// Reconstruct into valid ISO standard with explicit Indian Standard Time offset (+05:30)
+                // Reconstruct into valid ISO standard with explicit Indian Standard Time offset (+05:30)
                 const validIsoString = `${year}-${month}-${day}T${time}:00+05:30`;
                 const submissionTime = new Date(validIsoString);
-                // -------------------------------------------------
-
+                
                 const ageInMs = now - submissionTime;
 
-                // Mode 2 Rule Restored: Skip data older than 24 hours OR completely invalid dates
-                // We allow a small buffer (-6 hours in MS) in case your computer clock is slightly desynced from the sheet
+                // Mode 2 Rule: Skip data older than 24 hours OR completely invalid dates
                 if (isNaN(ageInMs) || ageInMs < -21600000 || ageInMs > oneDayInMs) return;
+
                 activeCount++;
                 const ageInHours = ageInMs / (1000 * 60 * 60);
 
