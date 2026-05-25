@@ -53,9 +53,6 @@ function updateLiveMap() {
 
                 const ageInMs = now - submissionTime;
 
-                // Mode 2 Rule: Skip data older than 24 hours or completely invalid dates
-                if (isNaN(ageInMs) || ageInMs < 0 || ageInMs > oneDayInMs) return;
-
                 activeCount++;
                 const ageInHours = ageInMs / (1000 * 60 * 60);
 
